@@ -74,6 +74,8 @@
 
 //PY springs: RWBoulanger and BJeremic
 #include <PySimple1.h>
+#include <PySimple3.h>
+#include <PySimple4.h>
 #include <TzSimple1.h>
 #include <QzSimple1.h>
 #include <PyLiq1.h>
@@ -784,6 +786,12 @@ FEM_ObjectBrokerAllClasses::getNewUniaxialMaterial(int classTag)
 	//PY springs: RWBoulanger and BJeremic
 	case MAT_TAG_PySimple1:
 		return new PySimple1();
+
+	case MAT_TAG_PySimple3:
+		return new PySimple3();
+
+	case MAT_TAG_PySimple4:
+		return new PySimple4();
 
 	case MAT_TAG_PyLiq1:
 		return new PyLiq1();

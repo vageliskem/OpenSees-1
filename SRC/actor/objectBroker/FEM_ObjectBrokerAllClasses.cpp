@@ -61,7 +61,7 @@
 
 // uniaxial material model header files
 #include <BoucWenMaterial.h>		//SAJalali
-#include <SPSW02.h>			;//SAJalali
+#include <SPSW02.h>			//SAJalali
 #include <ElasticMaterial.h>
 #include <ElasticMultiLinear.h>
 #include <Elastic2Material.h>
@@ -104,6 +104,8 @@
 #include <PySimple2.h>
 #include <TzSimple2.h>
 #include <QzSimple2.h>
+#include <PySimple3.h>
+#include <PySimple4.h>
 #include <PyLiq1.h>
 #include <TzLiq1.h>
 
@@ -1116,6 +1118,12 @@ FEM_ObjectBrokerAllClasses::getNewUniaxialMaterial(int classTag)
 
 	case MAT_TAG_PySimple1:
 		return new PySimple1();
+
+	case MAT_TAG_PySimple3:
+		return new PySimple3();
+
+	case MAT_TAG_PySimple4:
+		return new PySimple4();
 
 	case MAT_TAG_PyLiq1:
 		return new PyLiq1();
