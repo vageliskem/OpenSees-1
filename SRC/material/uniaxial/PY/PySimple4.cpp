@@ -79,9 +79,9 @@ void* OPS_PySimple4()
 	return 0;
     }
     
-    double ddata[5] = {0,0,0,0,0};
+    double ddata[8] = {0,0,0,0,0,0,0,0};
     numdata = OPS_GetNumRemainingInputArgs();
-    if (numdata > 5) numdata = 5;
+    if (numdata > 8) numdata = 8;
     if (OPS_GetDoubleInput(&numdata, ddata) < 0) {
 	opserr << "WARNING invalid double inputs\n";
 	return 0;
@@ -89,7 +89,7 @@ void* OPS_PySimple4()
     
     UniaxialMaterial *theMaterial = 0;
     theMaterial = new PySimple4(idata[0], MAT_TAG_PySimple4, idata[1], ddata[0], ddata[1],
-    				ddata[2], ddata[3],ddata[4]);
+    				ddata[2],ddata[3],ddata[4],ddata[5],ddata[6],ddata[7]);
     
     return theMaterial;
 }
@@ -98,9 +98,9 @@ void* OPS_PySimple4()
 //	Constructor with data
 
 PySimple4::PySimple4(int tag, int classtag, int soil, double p_ult, double y_50,
-				 double dragratio, double dash_pot, double s1or3)
+				 double dragratio, double dash_pot, double s1or3 , double pyield_3 , double ke_3 , double C_3)
 :UniaxialMaterial(tag,classtag),
- soilType(soil), pult(p_ult), y50(y_50), drag(dragratio), dashpot(dash_pot), simple1or3(s1or3)
+ soilType(soil), pult(p_ult), y50(y_50), drag(dragratio), dashpot(dash_pot), simple1or3(s1or3), pyield(pyield_3), ke(ke_3), C(C_3)
 {
   // Initialize PySimple variables and history variables
   //
@@ -113,7 +113,7 @@ PySimple4::PySimple4(int tag, int classtag, int soil, double p_ult, double y_50,
 
 PySimple4::PySimple4()
 :UniaxialMaterial(0,0),
- soilType(0), pult(0.0), y50(0.0), drag(0.0), dashpot(0.0), simple1or3(0.0)
+ soilType(0), pult(0.0), y50(0.0), drag(0.0), dashpot(0.0), simple1or3(0.0), pyield(0.0), ke(0.0), C(0.0)
 {
 }
 
@@ -412,6 +412,150 @@ void PySimple4::getNearField(double ylast, double dy, double dy_old) // Proper p
 
 
 
+// /////////////////////////////////////////////////////////////////////
+// void PySimple4::getNearField_3(double ylast, double dy, double dy_old) //get Near Field according to PYsimple1
+// {
+// 	// Limit "dy" step size if it is oscillating in sign and not shrinking
+// 	//
+// 	if(dy*dy_old < 0.0 && fabs(dy/dy_old) > 0.5) dy = -dy_old/2.0;
+
+// 	// Set "dy" so "y" is at middle of elastic zone if oscillation is large.
+// 	// Note that this criteria is based on the min step size in setTrialStrain.
+// 	//
+// 	if(dy*dy_old < -y50*y50) dy = (TNFyinr + TNFyinl)/2.0 - ylast;
+	
+// 	// Establish trial "y" and direction of loading (with NFdy) for entire step
+// 	//
+// 	TNF_y = ylast + dy;  //ylast commited y and dy _V
+// 	double NFdy = TNF_y - CNF_y;
+
+// 	// Treat as elastic if NFdy is below PYtolerance
+// 	//
+// 	if(fabs(NFdy*TNF_tang/pult) < 10.0*PYtolerance) 
+// 	{
+// 		TNF_p = TNF_p + dy*TNF_tang;
+// 		if(fabs(TNF_p) >=pult) TNF_p=(TNF_p/fabs(TNF_p))*(1.0-PYtolerance)*pult;
+// 		return;
+// 	}
+
+// 	// Reset the history terms to the last Committed values, and let them
+// 	// reset if the reversal of loading persists in this step.
+// 	//
+// 	if(TNFpinr != CNFpinr || TNFpinl != CNFpinl)
+// 	{
+// 		TNFpinr = CNFpinr;
+// 		TNFpinl = CNFpinl;
+// 		TNFyinr = CNFyinr;
+// 		TNFyinl = CNFyinl;
+// 	}
+
+// 	// For stability, may have to limit "dy" step size if direction changed.
+// 	//
+// 	bool changeDirection = false;
+	
+// 	// Direction change from a yield point triggers new Elastic range
+// 	//
+// 	double minE = 0.25;		// The min Elastic range on +/- side of p=0
+// 	if(CNF_p > CNFpinr && NFdy <0.0){				// from pos to neg direction
+// 		changeDirection = true;
+// 		TNFpinr = CNF_p;
+// 		if(fabs(TNFpinr)>=(1.0-PYtolerance)*pult){TNFpinr=(1.0-2.0*PYtolerance)*pult;}
+// 		TNFpinl = TNFpinr - 2.0*pult*Elast;
+// 		if (TNFpinl > -minE*pult) {TNFpinl = -minE*pult;}
+// 		TNFyinr = CNF_y;
+// 		TNFyinl = TNFyinr - (TNFpinr-TNFpinl)/NFkrig; 
+// 		// TNFyinl = TNFyinr - (TNFpinr-TNFpinl)/ke; \\ _v
+// 	}
+// 	if(CNF_p < CNFpinl && NFdy > 0.0){				// from neg to pos direction 
+// 		changeDirection = true;
+// 		TNFpinl = CNF_p;
+// 		if(fabs(TNFpinl)>=(1.0-PYtolerance)*pult){TNFpinl=(-1.0+2.0*PYtolerance)*pult;}
+// 		TNFpinr = TNFpinl + 2.0*pult*Elast;
+// 		if (TNFpinr < minE*pult) {TNFpinr = minE*pult;}
+// 		TNFyinl = CNF_y;
+// 		TNFyinr = TNFyinl + (TNFpinr-TNFpinl)/NFkrig; 
+// 		// TNFyinr = TNFyinl + (TNFpinr-TNFpinl)/ke;  \\ _v
+// 	}
+// 	// Now if there was a change in direction, limit the step size "dy"
+// 	//
+// 	if(changeDirection == true) {
+// 		double maxdy = 0.25*pult/NFkrig;
+// 		// double maxdy = 0.25*pult/ke; // _v
+
+// 		if(fabs(dy) > maxdy) dy = (dy/fabs(dy))*maxdy;
+// 	}
+
+// 	// Now, establish the trial value of "y" for use in this function call.
+// 	//
+// 	TNF_y = ylast + dy;
+
+// 	// Postive loading
+// 	//
+// 	if(NFdy >= 0.0){
+// 		// Check if elastic using y < yinr
+// 		if(TNF_y <= TNFyinr){							// stays elastic
+// 			// NFkrig  = 100.0 * (0.5 * pult) / y50
+// 			// TNF_tang = NFkrig;
+// 			// TNF_p = TNFpinl + (TNF_y - TNFyinl)*NFkrig;
+// 			TNF_tang = ke;
+// 			TNF_p = TNFpinl + (TNF_y - TNFyinl)*ke;
+
+// 		}
+// 		else {
+
+// 			TNF_tang = 1.0*np * (pult-TNFpinr) * pow(yref,np) 
+// 				* pow(yref - TNFyinr + TNF_y, -np-1.0);
+// 			TNF_p = pult - (pult-TNFpinr)* pow(yref/(yref-TNFyinr+TNF_y),np); // This is the first equation in the 
+// 			// paper  appendix. according to this yref=c*y50 with c=10 for clay and 0.5 for sand; _V
+			
+// 			// opserr << "WARNING" << simple1or3 << endln;
+
+// 		}
+// 	}
+
+// 	// Negative loading
+// 	//
+// 	if(NFdy < 0.0){
+// 		// Check if elastic using y < yinl
+// 		if(TNF_y >= TNFyinl){							// stays elastic
+// 			// TNF_tang = NFkrig;
+// 			// TNF_p = TNFpinr + (TNF_y - TNFyinr)*NFkrig;
+// 			TNF_tang = ke;
+// 			TNF_p = TNFpinr + (TNF_y - TNFyinr)*ke;
+// 		}
+// 		else {
+// 			// TNF_tang = NFkrig;
+// 			// TNF_p = TNFpinr + (TNF_y - TNFyinr)*NFkrig;
+// 			np=np*1.0;
+// 			TNF_tang = np * (pult+TNFpinl) * pow(yref,np) 
+// 				* pow(yref + TNFyinl - TNF_y, -np-1.0);
+// 			TNF_p = -pult + (pult+TNFpinl)* pow(yref/(yref+TNFyinl-TNF_y),np);
+
+// 		}
+// 	}
+
+// 	// Ensure that |p|<pult and tangent not zero or negative.
+// 	//
+// 	if(fabs(TNF_p) >=pult) TNF_p=(TNF_p/fabs(TNF_p))*(1.0-PYtolerance)*pult;
+// 	if(TNF_tang <= 1.0e-2*pult/y50) TNF_tang = 1.0e-2*pult/y50;
+
+//     return;
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /////////////////////////////////////////////////////////////////////
 void PySimple4::getNearField_3(double ylast, double dy, double dy_old) //get Near Field according to PYsimple1
 {
@@ -435,110 +579,523 @@ void PySimple4::getNearField_3(double ylast, double dy, double dy_old) //get Nea
 	{
 		TNF_p = TNF_p + dy*TNF_tang;
 		if(fabs(TNF_p) >=pult) TNF_p=(TNF_p/fabs(TNF_p))*(1.0-PYtolerance)*pult;
+		      // opserr << "WARNING P1=" << P1 << endln;
+
 		return;
 	}
+	// else
+	// {	
+	// 	TNF_p = TNF_p + dy*TNF_tang; 
+	// 	return;
+	// }
 
-	// Reset the history terms to the last Committed values, and let them
-	// reset if the reversal of loading persists in this step.
-	//
-	if(TNFpinr != CNFpinr || TNFpinl != CNFpinl)
-	{
-		TNFpinr = CNFpinr;
-		TNFpinl = CNFpinl;
-		TNFyinr = CNFyinr;
-		TNFyinl = CNFyinl;
-	}
 
-	// For stability, may have to limit "dy" step size if direction changed.
-	//
-	bool changeDirection = false;
+
+		
+		
+			// HEREEE
+	
+	
+		signdy = sign(dy);	//note sign(dy) gives same value as sign(yRate)
+		signdyLast = sign(dyLast);
+		TpinF = CpinF;
+		TpinB = CpinB;
+		double CpinFB4check = CpinF;
+		double CpinBB4check = CpinB;
+		TpinUse = CpinLast;
+		Tyin = Cyin;
+		TLastYieldDir = CLastYieldDir;
+		int yRate3 = 0.0; //set previously defined yRate tp yRate3 and set it to zero;
+
+
+
+
+
+  if(yRate3 == 0.0)
+    {
+      // P1 = Cp+ke*dy;	//this is the viscoelastic force predictor which assumes all the displacement is elastic. If yielding occurs, a revised version of this equation will be used which considers only the viscoeslatic portion of the deformation.
+      TNF_p = TNF_p+ke*dy;	//this is the viscoelastic force predictor which assumes all the displacement is elastic. If yielding occurs, a revised version of this equation will be used which considers only the viscoeslatic portion of the deformation.
+      // opserr << "WARNING TNF_p=" << TNF_p << endln;
+      // return;
+    }
+  else
+    {
+      TNF_p = TNF_p+ke*dy+((dashpot/tstep1)*dy)-((dashpot/tstep2)*dyELast);	
+    }
+  if (signdy!=0 && signdy != TLastYieldDir && sign(TNF_p-Cp)!=signdy) {
+    TNF_p = TNF_p+(0.000001*signdy);	//this ensures that when the displacement reverses, the load does not continue in the previous direction. This would only occur in unusual situations where deceleration yielding or perhaps a load reversal had also occured during the previous step.	
+  }	
+  Tp = TNF_p;
+  // 	Ttangent
+  if(yRate3 == 0.0)
+    {
+      Ttangent = ke;
+    }
+  else if (dy != 0.0 && dashpot == 0.0) {
+    Ttangent = ke;	
+  }
+  else if (dy != 0.0) {
+    Ttangent = ke+dashpot*((1.0/tstep1)-(dyELast/(tstep2*dy)));
+  }
+  else if (dy == 0.0 && dashpot != 0.0 && sign(Tp-Cp) != 0.0){
+    // for case where dy is zero, if previous dashpot force was nonzero, the tangent will either be pos. or neg. infinity, since the force will
+    // change without y changing. This is handled as a special case by the code below, but for now the tangent is saved as ke
+    Ttangent = Ctangent;
+  }
+  else {
+    Ttangent = ke;
+  }
+  Tpalpha = Cpalpha;
+  f = fabs(Tp-Cpalpha)-pyield;	//yield function
+  if (f <= 0.0)
+    {
+      TyeTotal =  (Tp-Cp+ke*CyeTotal+dashpot*CyeTotal/tstep1+dashpot*dyELast/tstep2)/(ke+dashpot/tstep1);
+      TdyE    = TyeTotal-CyeTotal;
+      return;	//no yielding
+    }
 	
 
 
-	// Direction change from a yield point triggers new Elastic range
-	//
-	double minE = 0.25;		// The min Elastic range on +/- side of p=0
-	if(CNF_p > CNFpinr && NFdy <0.0){				// from pos to neg direction
-		changeDirection = true;
-		TNFpinr = CNF_p;
-		if(fabs(TNFpinr)>=(1.0-PYtolerance)*pult){TNFpinr=(1.0-2.0*PYtolerance)*pult;}
-		TNFpinl = TNFpinr - 2.0*pult*Elast;
-		if (TNFpinl > -minE*pult) {TNFpinl = -minE*pult;}
-		TNFyinr = CNF_y;
-		TNFyinl = TNFyinr - (TNFpinr-TNFpinl)/NFkrig; 
-	}
-	if(CNF_p < CNFpinl && NFdy > 0.0){				// from neg to pos direction 
-		changeDirection = true;
-		TNFpinl = CNF_p;
-		if(fabs(TNFpinl)>=(1.0-PYtolerance)*pult){TNFpinl=(-1.0+2.0*PYtolerance)*pult;}
-		TNFpinr = TNFpinl + 2.0*pult*Elast;
-		if (TNFpinr < minE*pult) {TNFpinr = minE*pult;}
-		TNFyinl = CNF_y;
-		TNFyinr = TNFyinl + (TNFpinr-TNFpinl)/NFkrig; 
-	}
-	// Now if there was a change in direction, limit the step size "dy"
-	//
-	if(changeDirection == true) {
-		double maxdy = 0.25*pult/NFkrig;
-		if(fabs(dy) > maxdy) dy = (dy/fabs(dy))*maxdy;
-	}
 
-	// Now, establish the trial value of "y" for use in this function call.
-	//
-	TNF_y = ylast + dy;
 
-	// Postive loading
-	//
-	if(NFdy >= 0.0){
-		// Check if elastic using y < yinr
-		if(TNF_y <= TNFyinr){							// stays elastic
-			TNF_tang = NFkrig;
-			TNF_p = TNFpinl + (TNF_y - TNFyinl)*NFkrig;
-		}
-		else {
 
-			 // TNF_tang = 5*NFkrig;
-			 // TNF_p = TNFpinl + (TNF_y - TNFyinl)*5*NFkrig;
-			TNF_tang = 1.0*np * (pult-TNFpinr) * pow(yref,np) 
-				* pow(yref - TNFyinr + TNF_y, -np-1.0);
-			TNF_p = pult - (pult-TNFpinr)* pow(yref/(yref-TNFyinr+TNF_y),np); // This is the first equation in the 
-			// paper  appendix. according to this yref=c*y50 with c=10 for clay and 0.5 for sand; _V
+
+  // Return mapping if yielding occurs
+  if(f>0)
+    {
+      double CpUse = Cp;
+      int signdyLast = sign(dyLast);
+      int signP = sign(Tp-Cp);
+      double dyELastUse = dyELast;
+      double CyeTotalUse = CyeTotal;
+      double bump = 0.0;
+      /////If the current P is very close to Pult and displacement increment is in same dir. as last step,
+      // // or the displacement increment is zero but the viscoelastic guess still lands above Pult,
+      // // there can be convergence issues because the residual for the correct value of next P gets very
+      // // small. Instead just assign Pult minus tol. as next P.
+      if(  (fabs(Cp) > 0.99*pult && fabs(TNF_p) > fabs(pult) && signdy == signdyLast) || (fabs(Cp) > 0.99*pult && fabs(P1) > fabs(pult) && signdy == 0)  )
+	{
+	  Tp = (pult-PYtolerance)*signdy;
+	  if (signP == 1) {TpinUse = TpinF;}
+	  else if (signP == -1) {TpinUse = TpinB;}
+	  else {TpinUse = CpinLast;}				
+	  TyeTotal = (Tp-CpUse+ke*CyeTotalUse+dashpot*CyeTotalUse/tstep1+dashpot*dyELastUse/tstep2)/(ke+dashpot/tstep1);
+	  TdyE    = TyeTotal-CyeTotalUse;
+	  //for tangent, consider entire increment (i.e. not just the post-bump behavior if first yield occured)
+	  if(dy==0.0 && TdyE == 0.0){
+	    Ttangent = 	1.0/((1.0/(ke)) + (1.0/(C*ke*((Tp-pult*sign(signdy))/(TpinUse-Tp)))));
+	  }
+	  else if (dy==0.0 && dashpot != 0.0){
+	    Ttangent = Ctangent;
+	  }
+	  else if (dy == 0.0 && dashpot == 0.0){
+	    Ttangent = 	1.0/((1.0/(ke)) + (1.0/(C*ke*((Tp-pult*sign(signdy))/(TpinUse-Tp)))));
+	  }
+	  else if (TdyE == 0.0){
+	    Ttangent = 	1.0/((1.0/(ke)) + (1.0/(C*ke*((Tp-pult*sign(signdy))/(TpinUse-Tp)))));
+	  }
+	  else{
+	    Ttangent = 	1.0/((1.0/(ke+dashpot*((1.0/tstep1)-(dyELast/(tstep2*TdyE))))) + (1.0/(C*ke*((Tp-pult*sign(Tp-Cp))/(TpinUse-Tp)))));
+	  }
+	  Tpalpha = Tp - pyield*signdy;
+	  // Compute viscoelastic displacement increment
+	  TLastYieldDir = signP;
+	  return;	
+	  }
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Test for deceleration yielding
+      //Special case... if displacement increment is in same dir. as last converged step but velocity is much less
+      // than the velocity in the previous step (or zero), the decreased force in the damper component could cause the
+      // viscoelastic force to decrease relative to Cp (this can only occur if the decrease in dashpot force is large
+      // relative to the increase in force in the elastic component, so with a relatively large dashpot coeff. and large 
+      // deceleration). This is somewhat counterituitive, because you would expect continuing to displace in the same
+      // dir. would keep increasing the load, but a large loss of damper force could cause the cummulative load to drop.
+      // If this drop is large enough, yielding could occur in the opposite direction of displacement, so the previous 
+      // if statements for re-assigning Tpin and Tyin won't work because they rely on sign(dy). Instead, need to use
+      // the term sign(P1-Cp), where P1 is the viscoelastic predictor guess.
+      //	If sign(P1-Cp) and signdy have opposite signs, this condition has occured...
+	
+      if(signP != signdy && signP != 0 && dy == 0.0 && signP != CLastYieldDir)
+	// special case for dy = zero
+	{
+	  //compute new Tpin based on signP instead of signdy...
+	  TpinUse = Cpalpha + pyield*signP;
+	  Tyin = Cy;	
+	  //Compute the change in viscoelastic displacement that occurs when the decrease in dashpot force causes P
+	  //	to drop from the current P to the yield surface. First compute time this takes by proportioning forces:
+	  TLastYieldDir = signP;
+	  pn1_a = TpinUse;									//lower bracket is current commited value of p
+	  pn1_b = (1.0-0.5*PYtolerance)*signP*pult;			//upper bracket is pult, but with opposite sign
+	  //...then don't change anything, just send in the regular values...
+	  CpUse = TpinUse;
+	  tstep1 = tstep;
+	  tstep2 = tstep;
+	  dyELastUse = dyELast;
+	  CyeTotalUse = CyeTotal;
+	  bump=Cp-TpinUse;
+	}
+      else if(signP != signdy && signP != 0 && signP != CLastYieldDir)
+	//	Decleration yielding for a non-zero dy case, still flip the search direction:
+	{
+	  TpinUse = Cpalpha - pyield*signdy;
+	  Tyin = Cy + (TpinUse-Cp)/(-1.0*((Tp-Cp)/dy));
+	  CpUse = TpinUse;
+	  TLastYieldDir = (-1)*signdy;
+	  pn1_a = TpinUse;
+	  pn1_b = (1.0-0.5*PYtolerance)*(-1.0)*signdy*pult;	//upper bracket is pult, but with opposite sign
+	  bump = Cp-TpinUse;
+	}
+      else
+	{
+	  // if no deceleration yielding, only re-assign Tpin if previous yield was not in the current direction
+	  if(TLastYieldDir != signdy && signdy!= 0)
+	    {
+	      TpinUse = Cpalpha + pyield*signdy;
+	      Tyin = Cy + (TpinUse-Cp)/((Tp-Cp)/dy);
+	    }
+	  pn1_a = Cp;											//lower bracket is current commited value of p
+	  if(signP == 0)
+	    {
+	      pn1_b = (1.0-0.5*PYtolerance)*CLastYieldDir*pult;			//upper bracket is pult
+	      TLastYieldDir = CLastYieldDir;
+	    }
+	  else{
+	    pn1_b = (1.0-0.5*PYtolerance)*signP*pult;			//upper bracket is pult
+	    TLastYieldDir = signP;
+	  }
+	}
+	
+      // Bumping routine and update backstress
+      //If decleration yielding occured, bumped values have already been computed and this loop will not be entered.
+      if((pn1_a < TpinUse && pn1_b > TpinUse) || (pn1_a > TpinUse && pn1_b < TpinUse)) // test to see if brackets are on opposite sides of yield surface
+	{
+	  pn1_a = TpinUse;
+	  CpUse = TpinUse;
+	  bump = TpinUse-Cp;	
+	}	
+      //Determine if backstress should be updated
+      double TpinUseB4check = TpinUse;
+      if (signP == 1 && TpinUse < CpinF) {
+	TpinF = TpinUse;
+      }
+      else if (signP ==1 && TpinUse >= CpinF && CLastYieldDir != 0){
+	TpinUse = CpinF;
+	TpinF = CpinF;
+      }
+      else if (signP ==1 && TpinUse >= CpinF && CLastYieldDir == 0){
+	TpinF = TpinUse;	
+      }
+      if (signP == -1 && TpinUse > CpinB) {
+	TpinB = TpinUse;
+      }
+      else if (signP ==-1 && TpinUse <= CpinB && CLastYieldDir != 0){
+	TpinUse = CpinB;
+	TpinB = CpinB;
+      }
+      else if (signP ==-1 && TpinUse <= CpinB && CLastYieldDir == 0){
+	TpinB = TpinUse;
+      }		
+      if (signP == 0){
+	TpinUse = CpinLast;
+      }
+
+      //Compute residuals 	
+      R1 = getResidual(ke,CpUse,pn1_a,dy,pult,C,TpinUse,dashpot,tstep1,dyELastUse,CyeTotalUse,tstep2,TNF_p,bump);
+      R2 = getResidual(ke,CpUse,pn1_b,dy,pult,C,TpinUse,dashpot,tstep1,dyELastUse,CyeTotalUse,tstep2,P1,bump);
+		
+      // Iterate to find P next			
+      //first check if either of the residuals computed at the starting brackets satisfies the tolerance			
+      if(fabs(R1)<PYtolerance*pult)
+	{
+	  Tp = pn1_a;
+	  TyeTotal = (Tp-CpUse+ke*CyeTotalUse+dashpot*CyeTotalUse/tstep1+dashpot*dyELastUse/tstep2)/(ke+dashpot/tstep1);
+	  TdyE    = TyeTotal-CyeTotalUse;
+	  //for tangent, consider entire increment (i.e. not just the post-bump behavior if first yield occured)
+	  if(dy==0.0 && TdyE == 0.0){
+	    Ttangent = 	1.0/((1.0/(ke)) + (1.0/(C*ke*((Tp-pult*sign(signdy))/(TpinUse-Tp)))));
+	  }
+	  else if (dy==0.0 && dashpot != 0.0){
+	    Ttangent = Ctangent;
+	  }
+	  else if ((dy == 0.0 && dashpot == 0.0) || TdyE == 0.0){
+	    Ttangent = 	1.0/((1.0/(ke)) + (1.0/(C*ke*((Tp-pult*sign(signdy))/(TpinUse-Tp)))));
+	  }
+	  else{
+	    Ttangent = 	1.0/((1.0/(ke+dashpot*((1.0/tstep1)-(dyELast/(tstep2*TdyE))))) + (1.0/(C*ke*((Tp-pult*sign(Tp-Cp))/(TpinUse-Tp)))));
+	  }
+	  //check if decleration cause a decrease in force
+	  signP = sign(Tp-Cp);
+	  if(signP != signdy)
+	    {
+	      signPalphaNew = (-1)*signdy;
+	    }
+	  else 
+	    {
+	      signPalphaNew = signdy;
+	    }
+	  Tpalpha = Tp - pyield*signPalphaNew;
+	  return;
+	}
+      if(fabs(R2)<PYtolerance*pult)
+	{
+	  Tp = pn1_b;
+	  TyeTotal = (Tp-CpUse+ke*CyeTotalUse+dashpot*CyeTotalUse/tstep1+dashpot*dyELastUse/tstep2)/(ke+dashpot/tstep1);
+	  TdyE    = TyeTotal-CyeTotalUse;
+	  //for tangent, consider entire increment (i.e. not just the post-bump behavior if first yield occured)
+	  if(dy==0.0 && TdyE == 0.0){
+	    Ttangent = 	1.0/((1.0/(ke)) + (1.0/(C*ke*((Tp-pult*sign(signdy))/(TpinUse-Tp)))));
+	  }
+	  else if (dy==0.0 && dashpot != 0.0){
+	    Ttangent = Ctangent;
+	  }
+	  else if ((dy == 0.0 && dashpot == 0.0) || TdyE == 0.0){
+	    Ttangent = 	1.0/((1.0/(ke)) + (1.0/(C*ke*((Tp-pult*sign(signdy))/(TpinUse-Tp)))));
+	  }
+	  else{
+	    Ttangent = 	1.0/((1.0/(ke+dashpot*((1.0/tstep1)-(dyELast/(tstep2*TdyE))))) + (1.0/(C*ke*((Tp-pult*sign(Tp-Cp))/(TpinUse-Tp)))));
+	  }
+	  //check if decleration cause in decrease in force
+	  signP = sign(Tp-Cp);
+	  if(signP != signdy)
+	    {
+	      signPalphaNew = (-1)*signdy;
+	    }
+	  else 
+	    {
+	      signPalphaNew = signdy;
+	    }
+	  Tpalpha = Tp - pyield*signPalphaNew;
+	  return;
+	}
 			
-			// opserr << "WARNING" << simple1or3 << endln;
-
+      // If R1 and R2 weren't within tolerance, check to see if they have the same sign...
+      if(sign(R1)==sign(R2))
+	{
+	  // 	Check for a condition in which, for a very large trial displacement step (keep in mind the solver may send a trial displacement step that is significantly larger than the eventual converged disp. step), the state goes from being either elastic or mostly elastic all the way to the yield surface. If this jump happens from far away from the yield surface, the residual for the upper bound guess can be very large and won't satisfy tolerance, even though it is essentially the correct guess. Test for this condition by nudging the upper bound guess even closer to pult and seeing if the residual continues to decrease.
+	  pn1_b = (1.0-0.0000000001*PYtolerance)*TLastYieldDir*pult;
+	  R2 = getResidual(ke,CpUse,pn1_b,dy,pult,C,TpinUse,dashpot,tstep1,dyELastUse,CyeTotalUse,tstep2,TNF_p,bump);
+	  if(fabs(R2)<PYtolerance*pult)
+	    {
+	      Tp = (1.0-0.5*PYtolerance)*TLastYieldDir*pult;	//keep consistent with other cases to avoid tiny fluctuations near the yield surface
+	      TyeTotal = (Tp-CpUse+ke*CyeTotalUse+dashpot*CyeTotalUse/tstep1+dashpot*dyELastUse/tstep2)/(ke+dashpot/tstep1);
+	      TdyE    = TyeTotal-CyeTotalUse;
+	      //for tangent, consider entire increment (i.e. not just the post-bump behavior if first yield occured)
+	      if(dy==0.0 && TdyE == 0.0){
+		Ttangent = 	1.0/((1.0/(ke)) + (1.0/(C*ke*((Tp-pult*sign(signdy))/(TpinUse-Tp)))));
+	      }
+	      else if (dy==0.0 && dashpot != 0.0){
+		Ttangent = Ctangent;
+	      }
+	      else if ((dy == 0.0 && dashpot == 0.0) || TdyE == 0.0){
+		Ttangent = 	1.0/((1.0/(ke)) + (1.0/(C*ke*((Tp-pult*sign(signdy))/(TpinUse-Tp)))));
+	      }
+	      else{
+		Ttangent = 	1.0/((1.0/(ke+dashpot*((1.0/tstep1)-(dyELast/(tstep2*TdyE))))) + (1.0/(C*ke*((Tp-pult*sign(Tp-Cp))/(TpinUse-Tp)))));
+	      }
+	      //check if decleration cause in decrease in force
+	      signP = sign(Tp-Cp);
+	      if(signP != signdy)
+		{
+		  signPalphaNew = (-1)*signdy;
 		}
+	      else 
+		{
+		  signPalphaNew = signdy;
+		}
+	      Tpalpha = Tp - pyield*signPalphaNew;
+	      return;
+	    }	
 	}
 
-	// Negative loading
-	//
-	if(NFdy < 0.0){
-		// Check if elastic using y < yinl
-		if(TNF_y >= TNFyinl){							// stays elastic
-			TNF_tang = NFkrig;
-			TNF_p = TNFpinr + (TNF_y - TNFyinr)*NFkrig;
+      //start Ridder's loop, initialize variables
+      double pn1_3 = 0.0;
+      double pn1_4 = 0.0;
+      double R3 = 0.0;
+      double R4 = 0.0;
+      double S = 0.0;
+      int i=0;
+      while((fabs(R1)>PYtolerance*pult) && (fabs(R2)>PYtolerance*pult))
+	{
+	  pn1_3 = (pn1_a+pn1_b)/2.0;
+	  R3    = getResidual(ke,CpUse,pn1_3,dy,pult,C,TpinUse,dashpot,tstep1,dyELastUse,CyeTotalUse,tstep2,TNF_p,bump);
+	  if(fabs(R3)<PYtolerance*pult)
+	    {
+	      Tp = pn1_3;
+	      TyeTotal = (Tp-CpUse+ke*CyeTotalUse+dashpot*CyeTotalUse/tstep1+dashpot*dyELastUse/tstep2)/(ke+dashpot/tstep1);
+	      TdyE    = TyeTotal-CyeTotalUse;
+	      //for tangent, consider entire increment (i.e. not just the post-bump behavior if first yield occured)
+	      if(dy==0.0 && TdyE == 0.0){
+		Ttangent = 	1.0/((1.0/(ke)) + (1.0/(C*ke*((Tp-pult*sign(signdy))/(TpinUse-Tp)))));
+	      }
+	      else if (dy==0.0 && dashpot != 0.0){
+		Ttangent = Ctangent;
+	      }
+	      else if ((dy == 0.0 && dashpot == 0.0) || TdyE == 0.0){
+		Ttangent = 	1.0/((1.0/(ke)) + (1.0/(C*ke*((Tp-pult*sign(signdy))/(TpinUse-Tp)))));
+	      }
+	      else{
+		Ttangent = 	1.0/((1.0/(ke+dashpot*((1.0/tstep1)-(dyELast/(tstep2*TdyE))))) + (1.0/(C*ke*((Tp-pult*sign(Tp-Cp))/(TpinUse-Tp)))));
+	      }
+	      //check if decleration causes in decrease in force
+	      signP = sign(Tp-Cp);
+	      if(signP != signdy)
+		{
+		  signPalphaNew = (-1)*signdy;
 		}
-		else {
-			// TNF_tang = NFkrig;
-			// TNF_p = TNFpinr + (TNF_y - TNFyinr)*NFkrig;
-			np=np*1.0;
-			TNF_tang = np * (pult+TNFpinl) * pow(yref,np) 
-				* pow(yref + TNFyinl - TNF_y, -np-1.0);
-			TNF_p = -pult + (pult+TNFpinl)* pow(yref/(yref+TNFyinl-TNF_y),np);
-
+	      else 
+		{
+		  signPalphaNew = signdy;
 		}
-	}
+	      Tpalpha = Tp - pyield*signPalphaNew;
+	      return ;
+	    }
+	  S = (sqrt(R3*R3 - R1*R2));
+	  pn1_4 = pn1_3+(pn1_3-pn1_a)*((sign(R1-R2)*R3)/(sqrt(R3*R3 - R1*R2)));
+	  R4    = getResidual(ke,CpUse,pn1_4,dy,pult,C,TpinUse,dashpot,tstep1,dyELastUse,CyeTotalUse,tstep2,TNF_p,bump);	
+	  if(fabs(R4)<PYtolerance*pult)
+	    {
+	      Tp = pn1_4;
+	      TyeTotal = (Tp-CpUse+ke*CyeTotalUse+dashpot*CyeTotalUse/tstep1+dashpot*dyELastUse/tstep2)/(ke+dashpot/tstep1);
+	      TdyE    = TyeTotal-CyeTotalUse;
+	      //for tangent, consider entire increment (i.e. not just the post-bump behavior if first yield occured)
+	      if(dy==0.0 && TdyE == 0.0){
+		Ttangent = 	1.0/((1.0/(ke)) + (1.0/(C*ke*((Tp-pult*sign(signdy))/(TpinUse-Tp)))));
+	      }
+	      else if (dy==0.0 && dashpot != 0.0){
+		Ttangent = Ctangent;
+	      }
+	      else if ((dy == 0.0 && dashpot == 0.0) || TdyE == 0.0){
+		Ttangent = 	1.0/((1.0/(ke)) + (1.0/(C*ke*((Tp-pult*sign(signdy))/(TpinUse-Tp)))));
+	      }
+	      else{
+		Ttangent = 	1.0/((1.0/(ke+dashpot*((1.0/tstep1)-(dyELast/(tstep2*TdyE))))) + (1.0/(C*ke*((Tp-pult*sign(Tp-Cp))/(TpinUse-Tp)))));
+	      }
+	      //check if decleration cause in decrease in force
+	      signP = sign(Tp-Cp);
+	      if(signP != signdy)
+		{
+		  signPalphaNew = (-1)*signdy;
+		}
+	      else 
+		{
+		  signPalphaNew = signdy;
+		}
+	      Tpalpha = Tp - pyield*signPalphaNew;
+	      return ;
+	    }
+	  if(sign(R3) != sign(R4))
+	    {
+	      pn1_a = pn1_3;
+	      pn1_b = pn1_4;
+	      R1 = R3;
+	      R2 = R4;
+	    }
+	  else
+	    {
+	      if(sign(R1) != sign(R4))
+		{
+		  pn1_a = pn1_a;
+		  pn1_b = pn1_4;
+		  R1 = R1;
+		  R2 = R4;
+		}
+	      else
+		{
+		  if(sign(R2) != sign(R4))
+		    {
+		      pn1_a = pn1_4;
+		      pn1_b = pn1_b;
+		      R1 = R4;
+		      R2 = R2;
+		    }
+		  else
+		    {
+		      //printf ("none of the Ridder's values had opposite signs-- error! \n");*/
+		    }
+		}
+	    }
+	  i++;
+	  if(i==PYmaxIterations){
+					
+	    if(fabs(pn1_a) > 0.995*pult && fabs(pn1_b) > 0.995*pult)
+	      {
+		Tp = (pn1_a+pn1_b)/2.0;
+		if(fabs(Tp) >= pult){
+		  Tp = (pult-PYtolerance)*signdy;
+		}
+		TyeTotal = (Tp-CpUse+ke*CyeTotalUse+dashpot*CyeTotalUse/tstep1+dashpot*dyELastUse/tstep2)/(ke+dashpot/tstep1);
+		TdyE    = TyeTotal-CyeTotalUse;
+		//for tangent, consider entire increment (i.e. not just the post-bump behavior if first yield occured)
+		if(dy==0.0 && TdyE == 0.0){
+		  Ttangent = 	1.0/((1.0/(ke)) + (1.0/(C*ke*((Tp-pult*sign(signdy))/(TpinUse-Tp)))));
+		}
+		else if (dy==0.0 && dashpot != 0.0){
+		  Ttangent = Ctangent;
+		}
+		else if ((dy == 0.0 && dashpot == 0.0) || TdyE == 0.0){
+		  Ttangent = 	1.0/((1.0/(ke)) + (1.0/(C*ke*((Tp-pult*sign(signdy))/(TpinUse-Tp)))));
+		}
+		else{
+		  Ttangent = 	1.0/((1.0/(ke+dashpot*((1.0/tstep1)-(dyELast/(tstep2*TdyE))))) + (1.0/(C*ke*((Tp-pult*sign(Tp-Cp))/(TpinUse-Tp)))));
+		}
+		//check if decleration cause in decrease in force
+		signP = sign(Tp-Cp);
+		if(signP != signdy)
+		  {
+		    signPalphaNew = (-1)*signdy;
+		  }
+		else 
+		  {
+		    signPalphaNew = signdy;
+		  }
+		Tpalpha = Tp - pyield*signPalphaNew;
+		// Compute viscoelastic displacement increment
+		return ;	
+	      }
+	    else {
+	      opserr << "Ridder's method for material tag " << this->getTag() << " failed to find a working value for P in " << PYmaxIterations << " iterations." << endln;
+	      Tp = Cp;
+	      Ttangent = Ctangent;
+	      Tpalpha = Cpalpha;
+	      TdyE = dy;
+	      return ;
+	    }
+	  }
+	}	
+			
+			
+    }	//end return mapping algorithm
+  return ;
 
-	// Ensure that |p|<pult and tangent not zero or negative.
-	//
-	if(fabs(TNF_p) >=pult) TNF_p=(TNF_p/fabs(TNF_p))*(1.0-PYtolerance)*pult;
-	if(TNF_tang <= 1.0e-2*pult/y50) TNF_tang = 1.0e-2*pult/y50;
 
-    return;
 }
-
-
-
-
 
 
 
@@ -596,6 +1153,7 @@ PySimple4::setTrialStrain (double newy, double yRate)
 	//
 		double dy_gap_old = ((Tp + dp) - TGap_p)/TGap_tang;
 		double dy_nf_old  = ((Tp + dp) - TNF_p) /TNF_tang;
+		// double dy_nf_old  = ((Tp + dp) - TNF_p) /ke; // Vag
 
 	// Iterate to distribute displacement among the series components.
 	// Use the incremental iterative strain & iterate at this strain.
@@ -606,13 +1164,24 @@ PySimple4::setTrialStrain (double newy, double yRate)
 
 		// Stress & strain update in Near Field element
 		double dy_nf = (Tp - TNF_p)/TNF_tang;
+		// double dy_nf = (Tp - TNF_p)/ke; // Vag
+
+
 		
 		if(simple1or3==3) 
 			{
-				getNearField_3(TNF_y,dy_nf,dy_nf_old); // for pysimple3
+		    opserr << "PySimple3 mat" << endln;
+			getNearField_3(TNF_y,dy_nf,dy_nf_old); // for pysimple3
+								// getNearField_3(TNF_y,dy_nf,dy_nf_old); // for pysimple3
+
 			}
 		else
-		{getNearField(TNF_y,dy_nf,dy_nf_old);} // for pysimple1
+			{
+		    opserr << "PySimple1 mat" << endln;
+			getNearField(TNF_y,dy_nf,dy_nf_old);
+			} // for pysimple1
+
+
 
 		// Residuals in Near Field element
 		double p_unbalance = Tp - TNF_p;
@@ -655,6 +1224,15 @@ PySimple4::setTrialStrain (double newy, double yRate)
 
 	return 0;
 }
+
+
+
+
+
+
+
+
+
 /////////////////////////////////////////////////////////////////////
 double 
 PySimple4::getStress(void)
@@ -893,6 +1471,7 @@ PySimple4::revertToStart(void)
 	TNF_p   = 0.0;
 	TNF_y   = 0.0;
 	TNF_tang= NFkrig;
+	// TNF_tang= ke; // _vag
 
 	// Drag components
 	//
@@ -924,6 +1503,66 @@ PySimple4::revertToStart(void)
 	Tp       = 0.0;
 	Ttangent = pow(1.0/TGap_tang + 1.0/TNF_tang + 1.0/TFar_tang, -1.0);
 	TyRate   = 0.0;
+
+
+
+
+	//Vagelis entries
+
+	
+
+	dy = 0.0;
+  CLastYieldDir = 0;
+  TLastYieldDir = 0;
+  signdy = 0;
+  Cp = 0.0;
+  Cy = 0.0;
+  Cyin = 0.0;
+  CpinF = 0.0;
+  CpinB = 0.0;
+  CpinLast = 0.0;
+  Ty = 0.0;
+  Tyin = 0.0;
+  Tp = 0.0;
+  TyRate = 0.0;
+  // Ttangent = ke;
+  TpinF = 0.0;
+  TpinB = 0.0;
+  TpinUse = 0.0;
+  Tpalpha = 0.0;
+  dyLast = 0.0;
+  signdyLast = 0.0;
+  dyELast = 0.0;
+  lam = 0;		//lambda, plastic multiplier
+  lamLB = 0;
+  lamUB = 0;		//lower- and upper-bound guesses for lambda
+  ypDot = 0;		//plastic displacement rate
+  P1 = 0;			//Force (dP1/dt) in viscoelastic spring component
+  P2 = 0;			//Force (dP2/dt) in plastic spring component
+  tstep = 0;		//time step, computed from yRate
+  yLast = 0;		//y from the timestep before the currently committed timestep, i.e. y(i)=y, y(i-1)=Cy, y(i-2)=yLast
+  ypRate = 0;		//plastic deformation rate
+  yeRate = 0;		//elastic deformation rate
+  TdyP = 0;		//plastic deformation increment
+  TdyE = 0;		//elastic deformation increment
+  signdy = 0;
+  residualLam = 0;	//residual when iterating to determine correct value of plastic multiplier
+  Rlam1 = 0;		//residual for lambda using lower- and upper-bound guesses
+  Rlam2 = 0;
+  sysTimeStep = 0;	//system time
+  bumped = 0;
+  pP1 = 0;
+  dyELastUse = 0;
+  signBump = 0.0;
+  P1veGuess = 0.0;
+  CyeTotal = 0.0;
+  TyeTotal = 0.0;
+  CtstepLast = 0.0;
+  tstep1 = 0.0;
+  tstep2 = 0.0;
+
+
+
 
 	// Now get all the committed variables initiated
 	//
@@ -1093,3 +1732,45 @@ PySimple4::Print(OPS_Stream &s, int flag)
 
 /////////////////////////////////////////////////////////////////////
 
+
+
+
+
+
+
+
+
+//  Below that point complementing functions from PYsimple3
+
+/////////////////////////////////////////////////////////////////////
+
+int
+PySimple4::sign(double val)
+{
+  if (val > 0) return 1;
+  if (val < 0) return -1;
+  return 0;
+}
+
+
+/////////////////////////////////////////////////////////////////////
+//	Residual function for plastic component
+double
+PySimple4::getResidual(double ke, double Cp, double Tp, double dy, double pu, double C, double Tpin, double dashpot, double tstepCurrent, double dyELast, double CyeTotal, double tstepLast, double Pveguess, double bump)
+{
+  signdy = sign(dy);
+  double signVEguess = sign(Pveguess-Cp);
+  if(pu>Tp*signdy)
+    {	
+      if(tstep != 0.0)
+	{		
+	  return    (C*ke*(dy-((Tp-Cp+(dashpot*(dyELast/tstepLast)-bump))/(ke+(dashpot/tstepCurrent)))))+(Tp-Cp)+(Tpin-pu*signVEguess)*(log(pu-Cp*signVEguess)-log(pu-Tp*signVEguess));
+	}
+      else{
+	// for static analysis with tstep = 0 the previous form would have blown up...
+	return ((Tp-Cp)*(1.0-1.0/C)+((Tpin-pu*signdy)*(log(pu-Tp*signdy)-log(pu-Cp*signdy)))/C - ke*dy);	
+      }
+    }	
+  else
+    return 0.0;
+}
